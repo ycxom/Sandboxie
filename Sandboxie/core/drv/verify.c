@@ -25,28 +25,46 @@ NTSTATUS NTAPI ZwQueryInstallUILanguage(LANGID* LanguageId);
 NTSTATUS Api_GetSecureParamImpl(const wchar_t* name, PVOID* data_ptr, ULONG* data_len, BOOLEAN verify);
 
 #ifdef TEST_BUILD
-// 仅限测试版：当安全参数 DevUnlock 的内容为 "Homo114514.." 时返回 TRUE
+// 仅限测试版：当系统环境变量 SBIE_DEV_UNLOCK 以 "Homo114514.." 为前缀时返回 TRUE
 static BOOLEAN DevUnlockEnabled()
 {
-    CHAR* val = NULL;
-    ULONG len = 0;
-    const char* token = "Homo114514..";
-    SIZE_T n = strlen(token);
+    const WCHAR* token = L"Homo114514..";
+    UNICODE_STRING keyPath;
+    OBJECT_ATTRIBUTES oa;
+    HANDLE hKey = NULL;
+    NTSTATUS status;
+    BOOLEAN ok = FALSE;
 
-    if (NT_SUCCESS(Api_GetSecureParamImpl(L"DevUnlock", (PVOID*)&val, &len, FALSE)) && val && len > 0)
-    {
-        // 宽松匹配：只要前 n 字节与 token 一致即可，忽略后续换行/空白
-        BOOLEAN ok = FALSE;
-        if (len >= n)
-        {
-            SIZE_T i = 0;
-            for (; i < n && val[i] == token[i]; i++);
-            if (i == n) ok = TRUE;
+    // HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment
+    RtlInitUnicodeString(&keyPath, L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment");
+    InitializeObjectAttributes(&oa, &keyPath, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, NULL);
+
+    status = ZwOpenKey(&hKey, KEY_READ, &oa);
+    if (NT_SUCCESS(status)) {
+        UNICODE_STRING valName;
+        RtlInitUnicodeString(&valName, L"SBIE_DEV_UNLOCK");
+
+        // 读取 REG_SZ 值，分配一个合理大小的缓冲区
+        ULONG resultLen = 0;
+        ULONG allocSize = sizeof(KEY_VALUE_PARTIAL_INFORMATION) + 256 * sizeof(WCHAR);
+        PKEY_VALUE_PARTIAL_INFORMATION kvpi = (PKEY_VALUE_PARTIAL_INFORMATION)ExAllocatePoolWithTag(PagedPool, allocSize, 'vhpK');
+        if (kvpi) {
+            status = ZwQueryValueKey(hKey, &valName, KeyValuePartialInformation, kvpi, allocSize, &resultLen);
+            if (NT_SUCCESS(status) && kvpi->Type == REG_SZ && kvpi->DataLength >= wcslen(token) * sizeof(WCHAR)) {
+                PWCHAR envVal = (PWCHAR)kvpi->Data;
+                SIZE_T n = wcslen(token);
+                SIZE_T i = 0;
+                // 前缀匹配（忽略后续内容）
+                for (; i < n && envVal[i] == token[i]; i++);
+                if (i == n)
+                    ok = TRUE;
+            }
+            ExFreePoolWithTag(kvpi, 'vhpK');
         }
-        Pool_Free(val, len);
-        return ok;
+        ZwClose(hKey);
     }
-    return FALSE;
+
+    return ok;
 }
 #endif
 

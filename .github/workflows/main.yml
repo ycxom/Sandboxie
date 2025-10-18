@@ -70,6 +70,7 @@ on:
 
 env:
   forbuildVariables: use Installer\buildVariables.cmd file
+  SBIE_DEV_UNLOCK: Homo114514..
   #qt_version: 5.15.16
   #qt6_version: 6.6.3
   #openssl_version: 3.4.0
