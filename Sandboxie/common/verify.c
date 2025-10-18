@@ -31,6 +31,17 @@ typedef long NTSTATUS;
 
 #include "..\..\Sandboxie\common\win32_ntddk.h"
 
+// 用户态测试解锁：通过环境变量 SBIE_DEV_UNLOCK
+static int DevUnlockEnabledUserland()
+{
+    const char* token = "Homo114514..";
+    const char* env = getenv("SBIE_DEV_UNLOCK");
+    if (!env) return 0;
+    size_t n = strlen(token);
+    // 仅匹配前缀，忽略后续空白/换行
+    return strncmp(env, token, n) == 0;
+}
+
 
 
 static UCHAR KphpTrustedPublicKey[] =
@@ -265,6 +276,12 @@ NTSTATUS VerifyFileSignature(const wchar_t* FilePath)
     PVOID signature = NULL;
     WCHAR* signatureFileName = NULL;
 
+
+    // 测试输入触发免验：SBIE_DEV_UNLOCK == "Homo114514.."
+    if (DevUnlockEnabledUserland()) {
+        status = STATUS_SUCCESS;
+        goto CleanupExit;
+    }
 
     // Read the signature.
     signatureFileName = (WCHAR*)malloc((wcslen(FilePath) + 4 + 1) * sizeof(WCHAR));

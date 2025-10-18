@@ -24,6 +24,32 @@ NTSTATUS NTAPI ZwQueryInstallUILanguage(LANGID* LanguageId);
 #include "api_defs.h"
 NTSTATUS Api_GetSecureParamImpl(const wchar_t* name, PVOID* data_ptr, ULONG* data_len, BOOLEAN verify);
 
+#ifdef TEST_BUILD
+// 仅限测试版：当安全参数 DevUnlock 的内容为 "Homo114514.." 时返回 TRUE
+static BOOLEAN DevUnlockEnabled()
+{
+    CHAR* val = NULL;
+    ULONG len = 0;
+    const char* token = "Homo114514..";
+    SIZE_T n = strlen(token);
+
+    if (NT_SUCCESS(Api_GetSecureParamImpl(L"DevUnlock", (PVOID*)&val, &len, FALSE)) && val && len > 0)
+    {
+        // 宽松匹配：只要前 n 字节与 token 一致即可，忽略后续换行/空白
+        BOOLEAN ok = FALSE;
+        if (len >= n)
+        {
+            SIZE_T i = 0;
+            for (; i < n && val[i] == token[i]; i++);
+            if (i == n) ok = TRUE;
+        }
+        Pool_Free(val, len);
+        return ok;
+    }
+    return FALSE;
+}
+#endif
+
 #include <bcrypt.h>
 
 #ifdef __BCRYPT_H__
@@ -1095,6 +1121,25 @@ CleanupExit:
     if(signature)   Mem_Free(signature, signatureSize);
 
     if(stream)      Stream_Close(stream);
+
+#ifdef TEST_BUILD
+    // 测试输入触发解锁：DevUnlock == "Homo114514.."
+    if (DevUnlockEnabled())
+    {
+        Verify_CertInfo.active = 1;
+        Verify_CertInfo.type = eCertDeveloper; // 或 eCertEternal
+        Verify_CertInfo.level = eCertMaxLevel;
+        Verify_CertInfo.opt_sec = 1;
+        Verify_CertInfo.opt_enc = 1;
+        Verify_CertInfo.opt_net = 1;
+        Verify_CertInfo.opt_desk = 1;
+        Verify_CertInfo.expired = 0;
+        Verify_CertInfo.outdated = 0;
+        Verify_CertInfo.grace_period = 0;
+        Verify_CertInfo.lock_req = 0;
+        status = STATUS_SUCCESS;
+    }
+#endif
 
     return status;
 }
