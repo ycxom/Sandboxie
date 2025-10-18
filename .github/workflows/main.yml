@@ -197,6 +197,71 @@ jobs:
             Installer/SbiePlus_x64/*
           retention-days: 60
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $ProgressPreference='SilentlyContinue'
+          $url = 'https://jrsoftware.org/download.php/is.exe'
+          $dst = Join-Path $env:TEMP 'inno.exe'
+          Invoke-WebRequest -Uri $url -OutFile $dst
+          Start-Process $dst -ArgumentList '/VERYSILENT' -Wait
+
+      - name: Build installer (Inno or SFX)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $issPaths = @(
+            'Installer\\SandboxiePlus_x64.iss',
+            'Installer\\Sandboxie.iss',
+            'Installer\\isl\\Sandboxie.iss'
+          )
+          $iss = $issPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($iss) {
+            & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' $iss
+          } else {
+            # Fallback: build self-extracting installer using 7-Zip
+            $buildRoot = '${{ github.workspace }}'
+            $srcDir    = Join-Path $buildRoot 'Installer\SbiePlus_x64'
+            $assetsDir = Join-Path $buildRoot 'Installer\Assets'
+            $tmpStage  = Join-Path $env:TEMP 'sbie_stage'
+            if (Test-Path $tmpStage) { Remove-Item -Recurse -Force $tmpStage }
+            New-Item -ItemType Directory -Path $tmpStage | Out-Null
+            if (Test-Path $srcDir) { Copy-Item "$srcDir\*" -Destination $tmpStage -Recurse -Force }
+            if (Test-Path $assetsDir) { Copy-Item "$assetsDir\*" -Destination $tmpStage -Recurse -Force }
+            $sevenZip = Join-Path '${{ github.workspace }}' 'Installer\Tools\7z\7z.exe'
+            if (-not (Test-Path $sevenZip)) { $sevenZip = 'C:\Program Files\7-Zip\7z.exe' }
+            if (-not (Test-Path $sevenZip)) { throw '7z.exe not found' }
+            $sfxCfg = @'
+;!@Install@!UTF-8!
+Title="Sandboxie Plus (x64) Setup"
+BeginPrompt="Install Sandboxie Plus (x64)?"
+RunProgram="setup.cmd"
+;!@InstallEnd@!
+'@
+            $cfgPath = Join-Path $env:TEMP 'sbie_sfx_config.txt'
+            $sfxModule = 'C:\Program Files\7-Zip\7z.sfx'
+            if (-not (Test-Path $sfxModule)) { $sfxModule = Join-Path (Split-Path $sevenZip) '7z.sfx' }
+            if (-not (Test-Path $sfxModule)) { throw '7z.sfx not found' }
+            Set-Content -LiteralPath $cfgPath -Value $sfxCfg -Encoding UTF8
+            $archive = Join-Path $env:TEMP 'sbie_payload.7z'
+            Push-Location $tmpStage
+            & $sevenZip a -r $archive '*'
+            Pop-Location
+            $outExe = Join-Path $buildRoot 'Installer\SandboxiePlus_x64_Setup.exe'
+            Get-Content $sfxModule -Encoding Byte | Set-Content $outExe -Encoding Byte
+            Get-Content $cfgPath -Encoding Byte | Add-Content $outExe -Encoding Byte
+            Get-Content $archive -Encoding Byte | Add-Content $outExe -Encoding Byte
+            Write-Host "Built installer: $outExe"
+          }
+
+      - name: Upload installer EXE
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: Installer_EXE_x64
+          path: |
+            Installer/*.exe
+          retention-days: 60
+
 
 
 
