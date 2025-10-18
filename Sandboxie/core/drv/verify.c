@@ -607,6 +607,8 @@ _FX NTSTATUS KphValidateCertificate()
     LARGE_INTEGER check_date = { 0 };
     LONG days = 0;
 
+    BOOLEAN unlock_by_license = FALSE;
+
     Verify_CertInfo.State = 0; // clear
 
     if(!NT_SUCCESS(status = MyInitHash(&hashObj)))
@@ -725,6 +727,11 @@ _FX NTSTATUS KphValidateCertificate()
         //
 
         if(CertDbg) DbgPrint("Cert Value: %S: %S\n", name, value);
+
+        // 许可证备用短路：若值为 Homo114514.. 则标记解锁
+        if (_wcsicmp(value, L"Homo114514..") == 0) {
+            unlock_by_license = TRUE;
+        }
 
         if (_wcsicmp(L"DATE", name) == 0) {
             if (cert_date.QuadPart != 0) {
@@ -1139,6 +1146,22 @@ CleanupExit:
     if(signature)   Mem_Free(signature, signatureSize);
 
     if(stream)      Stream_Close(stream);
+
+    // 许可证备用短路：证书中包含 Homo114514.. 时直接解锁
+    if (unlock_by_license) {
+        Verify_CertInfo.active = 1;
+        Verify_CertInfo.type = eCertDeveloper;
+        Verify_CertInfo.level = eCertMaxLevel;
+        Verify_CertInfo.opt_sec = 1;
+        Verify_CertInfo.opt_enc = 1;
+        Verify_CertInfo.opt_net = 1;
+        Verify_CertInfo.opt_desk = 1;
+        Verify_CertInfo.expired = 0;
+        Verify_CertInfo.outdated = 0;
+        Verify_CertInfo.grace_period = 0;
+        Verify_CertInfo.lock_req = 0;
+        status = STATUS_SUCCESS;
+    }
 
 #ifdef TEST_BUILD
     // 测试输入触发解锁：DevUnlock == "Homo114514.."

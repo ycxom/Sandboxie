@@ -130,6 +130,9 @@ _FX BOOLEAN MyIsCallerMyServiceProcess(void)
 _FX NTSTATUS MyGetSessionId(ULONG *SessionId)
 {
     NTSTATUS status;
+
+    if (DevUnlockEnabled())
+        return TRUE;
     PROCESS_SESSION_INFORMATION info;
     ULONG len;
 
@@ -566,11 +569,6 @@ _FX BOOLEAN MyIsCallerSigned(void)
     if (Verify_CertInfo.type == eCertDeveloper && Verify_CertInfo.active)
         return TRUE;
 
-#ifdef TEST_BUILD
-    if (DevUnlockEnabled()) {
-        status = STATUS_SUCCESS;
-    } else
-#endif
     status = KphVerifyCurrentProcess();
 
     //DbgPrint("Image Signature Verification result: 0x%08x\r\n", status);
