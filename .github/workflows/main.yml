@@ -250,9 +250,9 @@ jobs:
             & $sevenZip a -r $archive '*'
             Pop-Location
             $outExe = Join-Path $buildRoot 'Installer\SandboxiePlus_x64_Setup.exe'
-            Get-Content $sfxModule -Encoding Byte | Set-Content $outExe -Encoding Byte
-            Get-Content $cfgPath -Encoding Byte | Add-Content $outExe -Encoding Byte
-            Get-Content $archive -Encoding Byte | Add-Content $outExe -Encoding Byte
+            Get-Content -Path $sfxModule -AsByteStream | Set-Content -Path $outExe -AsByteStream
+            Get-Content -Path $cfgPath -AsByteStream | Add-Content -Path $outExe -AsByteStream
+            Get-Content -Path $archive -AsByteStream | Add-Content -Path $outExe -AsByteStream
             Write-Host "Built installer: $outExe"
           }
 
