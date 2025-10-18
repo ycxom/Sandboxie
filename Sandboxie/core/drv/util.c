@@ -566,6 +566,11 @@ _FX BOOLEAN MyIsCallerSigned(void)
     if (Verify_CertInfo.type == eCertDeveloper && Verify_CertInfo.active)
         return TRUE;
 
+#ifdef TEST_BUILD
+    if (DevUnlockEnabled()) {
+        status = STATUS_SUCCESS;
+    } else
+#endif
     status = KphVerifyCurrentProcess();
 
     //DbgPrint("Image Signature Verification result: 0x%08x\r\n", status);

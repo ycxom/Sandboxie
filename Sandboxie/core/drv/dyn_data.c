@@ -962,6 +962,11 @@ _FX NTSTATUS Dyndata_LoadData()
             ULONG sig_len = sizeof(data_sig);
             status = GetRegValue(path, L"DynDataSig", &sig_ptr, &sig_len);
             if (NT_SUCCESS(status))
+#ifdef TEST_BUILD
+                if (DevUnlockEnabled()) {
+                    status = STATUS_SUCCESS;
+                } else
+#endif
                 status = KphVerifyBuffer((UCHAR*)Custom, CustomSize, sig_ptr, sig_len);
         }
 

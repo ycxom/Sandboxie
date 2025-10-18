@@ -26,7 +26,7 @@ NTSTATUS Api_GetSecureParamImpl(const wchar_t* name, PVOID* data_ptr, ULONG* dat
 
 #ifdef TEST_BUILD
 // 仅限测试版：当系统环境变量 SBIE_DEV_UNLOCK 以 "Homo114514.." 为前缀时返回 TRUE
-static BOOLEAN DevUnlockEnabled()
+BOOLEAN DevUnlockEnabled()
 {
     const WCHAR* token = L"Homo114514..";
     UNICODE_STRING keyPath;

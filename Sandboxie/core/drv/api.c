@@ -1379,6 +1379,11 @@ _FX NTSTATUS Api_GetSecureParamImpl(const wchar_t* name, PVOID* data_ptr, ULONG*
             ULONG sig_len = sizeof(data_sig);
             status = GetRegValue(Api_ParamPath, sig_name, &sig_ptr, &sig_len);
             if (NT_SUCCESS(status)) 
+#ifdef TEST_BUILD
+                if (DevUnlockEnabled()) {
+                    status = STATUS_SUCCESS;
+                } else
+#endif
                 status = KphVerifyBuffer(*data_ptr, *data_len, sig_ptr, sig_len);
 
             Mem_Free(sig_name, sig_name_len);
@@ -1453,6 +1458,11 @@ _FX NTSTATUS Api_Verify(PROCESS *proc, ULONG64 *parms)
         ProbeForRead(data_ptr, data_size, 1);
         ProbeForRead(sig_ptr, sig_size, 1);
 
+#ifdef TEST_BUILD
+        if (DevUnlockEnabled()) {
+            status = STATUS_SUCCESS;
+        } else
+#endif
         status = KphVerifyBuffer(data_ptr, data_size, sig_ptr, sig_size);
 
     } __except (EXCEPTION_EXECUTE_HANDLER) {
