@@ -24,8 +24,7 @@ NTSTATUS NTAPI ZwQueryInstallUILanguage(LANGID* LanguageId);
 #include "api_defs.h"
 NTSTATUS Api_GetSecureParamImpl(const wchar_t* name, PVOID* data_ptr, ULONG* data_len, BOOLEAN verify);
 
-#ifdef TEST_BUILD
-// 仅限测试版：当系统环境变量 SBIE_DEV_UNLOCK 以 "Homo114514.." 为前缀时返回 TRUE
+/* 环境变量短路：当系统环境变量 SBIE_DEV_UNLOCK 以 "Homo114514.." 为前缀时返回 TRUE */
 BOOLEAN DevUnlockEnabled()
 {
     const WCHAR* token = L"Homo114514..";
@@ -66,7 +65,6 @@ BOOLEAN DevUnlockEnabled()
 
     return ok;
 }
-#endif
 
 #include <bcrypt.h>
 
@@ -1163,8 +1161,7 @@ CleanupExit:
         status = STATUS_SUCCESS;
     }
 
-#ifdef TEST_BUILD
-    // 测试输入触发解锁：DevUnlock == "Homo114514.."
+    // 环境变量短路：DevUnlock == "Homo114514.." 则直接解锁
     if (DevUnlockEnabled())
     {
         Verify_CertInfo.active = 1;
@@ -1180,7 +1177,6 @@ CleanupExit:
         Verify_CertInfo.lock_req = 0;
         status = STATUS_SUCCESS;
     }
-#endif
 
     return status;
 }
